@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fish & Cheers — 販売記録</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0d0d0d; --surface:#161616; --surface2:#1f1f1f; --border:#2a2a2a;
+    --gold:#c9a84c; --gold-light:#e8c97a; --gold-dim:#7a6128;
+    --cream:#f2ead8; --text:#e8e0d0; --text-dim:#7a7268;
+    --red:#c0392b; --green:#27ae60; --accent:#3d8b6b;
+    --beer:#d4a017; --fish:#4a90d9; --set:#8b5cf6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:14px;min-height:100vh;padding-bottom:90px}
+
+  /* HEADER */
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .logo{font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)}
+  .logo span{color:var(--text-dim);font-size:10px;font-family:'DM Mono',monospace;display:block;margin-top:1px;letter-spacing:.1em}
+  .header-right{display:flex;align-items:center;gap:10px}
+  #clock{font-family:'DM Mono',monospace;font-size:15px;color:var(--gold-light)}
+  .sync-pill{display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:4px 10px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);cursor:default;transition:all .2s}
+  .sync-pill.ok{border-color:var(--green);color:var(--green)}
+  .sync-pill.err{border-color:var(--red);color:var(--red)}
+  .sync-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+  /* TABS */
+  .tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface)}
+  .tab{flex:1;padding:11px 0;text-align:center;font-size:11px;letter-spacing:.08em;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;font-family:'DM Mono',monospace;text-transform:uppercase}
+  .tab.active{color:var(--gold-light);border-bottom-color:var(--gold)}
+
+  main{padding:14px;max-width:480px;margin:0 auto}
+  .page{display:none}.page.active{display:block}
+  .slabel{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.2em;color:var(--text-dim);text-transform:uppercase;margin-bottom:10px}
+  section{margin-bottom:20px}
+
+  /* METRICS */
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .mc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:13px 15px}
+  .mc.full{grid-column:span 2}.mc.hl{border-color:var(--gold-dim)}
+  .ml{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--text-dim);text-transform:uppercase;margin-bottom:5px}
+  .mv{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--cream);line-height:1}
+  .mv.gold{color:var(--gold-light)}.mv.green{color:var(--green)}.mv.red{color:var(--red)}
+  .ms{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:4px}
+  .bep-pct{font-family:'DM Mono',monospace;font-size:19px;color:var(--gold-light);font-weight:500}
+  .bep-pct.over{color:var(--green)}
+  .bep-track{background:var(--border);border-radius:4px;height:7px;overflow:hidden;margin-top:8px}
+  .bep-fill{height:100%;border-radius:4px;background:var(--gold);transition:width .5s,background .3s}
+  .bep-fill.over{background:var(--green)}
+  .bep-ticks{display:flex;justify-content:space-between;margin-top:3px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim)}
+
+  /* ITEM CARDS */
+  .item-cards{display:grid;grid-template-columns:1fr;gap:10px}
+  .item-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0;overflow:hidden;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:transform .1s,border-color .15s;position:relative}
+  .item-card:active{transform:scale(.97)}
+  .item-card-inner{display:flex;align-items:center;gap:0;height:72px}
+  .item-card-accent{width:6px;height:100%;flex-shrink:0}
+  .item-card-body{flex:1;padding:0 16px}
+  .item-card-name{font-size:17px;font-weight:700;color:var(--cream);margin-bottom:3px}
+  .item-card-price{font-family:'DM Mono',monospace;font-size:13px;color:var(--text-dim)}
+  .item-card-count{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--text-dim);padding-right:18px;min-width:56px;text-align:right}
+  .item-card-plus{font-size:28px;color:var(--gold-dim);padding-right:18px;font-weight:300}
+
+  /* ripple */
+  .ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.12);transform:scale(0);animation:rpl .55s linear;pointer-events:none}
+  @keyframes rpl{to{transform:scale(5);opacity:0}}
+
+  /* UNDO/NOTE */
+  .action-row{display:flex;gap:8px;margin-top:10px}
+  .btn-act{flex:1;padding:11px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s}
+  .btn-act:hover:not(:disabled){border-color:var(--red);color:var(--red)}
+  .btn-act.note:hover{border-color:var(--accent)!important;color:var(--accent)!important}
+  .btn-act:disabled{opacity:.3;cursor:not-allowed}
+
+  /* BREAKDOWN */
+  .bk-rows{display:flex;flex-direction:column;gap:7px}
+  .bk-row{background:var(--surface2);border-radius:7px;padding:10px 14px;display:flex;align-items:center;gap:10px}
+  .bk-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .bk-name{flex:1;font-size:13px}
+  .bk-cnt{font-family:'DM Mono',monospace;font-size:12px;color:var(--text-dim)}
+  .bk-amt{font-family:'DM Mono',monospace;font-size:13px;color:var(--gold-light)}
+
+  /* LOG */
+  .log-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .log-hdr{padding:9px 13px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--text-dim);display:flex;justify-content:space-between;align-items:center}
+  .log-clr{background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:2px 5px;border-radius:3px;transition:color .15s}
+  .log-clr:hover{color:var(--red)}
+  .log-list{max-height:300px;overflow-y:auto}
+  .log-item{display:grid;grid-template-columns:72px 1fr auto auto;gap:6px;padding:8px 13px;border-bottom:1px solid var(--border);align-items:center;animation:fi .2s}
+  .log-item:last-child{border-bottom:none}
+  .log-item.note-r{background:rgba(61,139,107,.07)}
+  .log-item.undone{opacity:.3;text-decoration:line-through}
+  @keyframes fi{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+  .lt{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)}
+  .ld{font-size:12px;color:var(--text)}
+  .lq{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);text-align:right}
+  .la{font-family:'DM Mono',monospace;font-size:12px;text-align:right;white-space:nowrap}
+  .log-empty{padding:22px;text-align:center;color:var(--text-dim);font-size:13px}
+
+  /* SETTINGS */
+  .cfg-panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:15px;margin-bottom:14px}
+  .cfg-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .cfg-row:last-child{margin-bottom:0}
+  .cfg-label{font-size:13px;color:var(--text)}
+  .cfg-label small{display:block;font-size:11px;color:var(--text-dim);margin-top:2px}
+  .cfg-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--cream);font-family:'DM Mono',monospace;font-size:15px;padding:8px 11px;width:120px;text-align:right;outline:none;transition:border-color .2s}
+  .cfg-input:focus{border-color:var(--gold-dim)}
+  .cfg-url{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--cream);font-size:12px;padding:9px 12px;width:100%;outline:none;font-family:'DM Mono',monospace;transition:border-color .2s;margin-top:8px}
+  .cfg-url:focus{border-color:var(--gold-dim)}
+  .btn-primary{width:100%;padding:12px;background:var(--gold-dim);border:1px solid var(--gold);border-radius:8px;color:var(--gold-light);font-size:14px;cursor:pointer;transition:all .15s;margin-top:8px}
+  .btn-primary:hover{background:#4a3018}
+
+  /* SETUP GUIDE */
+  .setup-steps{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
+  .step{display:flex;gap:12px;margin-bottom:14px}
+  .step:last-child{margin-bottom:0}
+  .step-num{width:24px;height:24px;border-radius:50%;background:var(--gold-dim);color:var(--gold-light);font-family:'DM Mono',monospace;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+  .step-body{font-size:12px;color:var(--text);line-height:1.7}
+  .step-body b{color:var(--gold-light)}
+  .step-body code{font-family:'DM Mono',monospace;background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:11px;color:var(--cream)}
+
+  /* PRICE EDITOR */
+  .price-edit-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+  .pe-row{display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:7px;padding:10px 13px}
+  .pe-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+  .pe-name{flex:1;font-size:13px;color:var(--text)}
+  .pe-price-input{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--cream);font-family:'DM Mono',monospace;font-size:14px;padding:6px 10px;width:90px;text-align:right;outline:none}
+  .pe-price-input:focus{border-color:var(--gold-dim)}
+
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:flex-end;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s}
+  .modal-overlay.open{opacity:1;pointer-events:all}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:22px 18px;width:100%;max-width:480px;margin:0 auto;transform:translateY(40px);transition:transform .25s}
+  .modal-overlay.open .modal{transform:translateY(0)}
+  .modal-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--gold);margin-bottom:14px}
+  .modal-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--cream);font-size:14px;padding:11px 13px;outline:none;font-family:'Noto Sans JP',sans-serif;margin-bottom:12px}
+  .modal-input:focus{border-color:var(--gold-dim)}
+  .modal-btns{display:flex;gap:8px}
+  .mbn{flex:1;padding:11px;border-radius:7px;font-size:13px;cursor:pointer;transition:all .15s;border:1px solid}
+  .mbn.cancel{background:transparent;border-color:var(--border);color:var(--text-dim)}
+  .mbn.confirm{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:9px 18px;font-size:13px;color:var(--text);white-space:nowrap;transition:transform .3s;z-index:300;pointer-events:none}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+
+  ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Fish &amp; Cheers <span>五月祭 2025 — 販売記録</span></div>
+  <div class="header-right">
+    <span id="clock">--:--</span>
+    <div class="sync-pill" id="sync-pill"><div class="sync-dot"></div><span id="sync-label">未接続</span></div>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showPage('sell')">販売</div>
+  <div class="tab" onclick="showPage('dash')">集計</div>
+  <div class="tab" onclick="showPage('log')">ログ</div>
+  <div class="tab" onclick="showPage('cfg')">設定</div>
+</div>
+
+<main>
+
+<!-- ── SELL ── -->
+<div class="page active" id="page-sell">
+  <section>
+    <div class="slabel">品目をタップして記録</div>
+    <div class="item-cards" id="item-cards"></div>
+    <div class="action-row">
+      <button class="btn-act" id="undo-btn" onclick="undoLast()" disabled>↩ 直前を取り消し</button>
+      <button class="btn-act note" onclick="openNote()">📝 メモ</button>
+    </div>
+  </section>
+  <!-- mini metrics on sell page -->
+  <section>
+    <div class="slabel">現在の売上</div>
+    <div class="metrics" style="margin-bottom:0">
+      <div class="mc hl">
+        <div class="ml">総売上</div>
+        <div class="mv gold" id="s-revenue">¥0</div>
+        <div class="ms" id="s-count">0 食</div>
+      </div>
+      <div class="mc">
+        <div class="ml">損益分岐比</div>
+        <div class="bep-pct" id="s-bep-pct">0%</div>
+        <div class="bep-track"><div class="bep-fill" id="s-bep-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ── DASH ── -->
+<div class="page" id="page-dash">
+  <div class="metrics">
+    <div class="mc full hl">
+      <div class="ml">総売上</div>
+      <div class="mv gold" id="d-revenue">¥0</div>
+      <div class="ms" id="d-count">合計 0 食</div>
+    </div>
+    <div class="mc">
+      <div class="ml">損益分岐比</div>
+      <div class="bep-pct" id="d-bep-pct">0%</div>
+      <div class="bep-track"><div class="bep-fill" id="d-bep-bar" style="width:0%"></div></div>
+      <div class="bep-ticks"><span>0</span><span id="d-bep-mid"></span><span id="d-bep-end"></span></div>
+    </div>
+    <div class="mc">
+      <div class="ml">残り必要売上</div>
+      <div class="mv" id="d-remaining">¥—</div>
+      <div class="ms">損益分岐まで</div>
+    </div>
+  </div>
+  <section>
+    <div class="slabel">品目別内訳</div>
+    <div class="bk-rows" id="bk-rows"></div>
+  </section>
+</div>
+
+<!-- ── LOG ── -->
+<div class="page" id="page-log">
+  <section>
+    <div class="log-wrap">
+      <div class="log-hdr">
+        <span>TIME · ITEM · QTY · AMOUNT</span>
+        <button class="log-clr" onclick="clearLog()">ログ消去</button>
+      </div>
+      <div class="log-list" id="log-list">
+        <div class="log-empty">まだ記録がありません</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ── SETTINGS ── -->
+<div class="page" id="page-cfg">
+  <section>
+    <div class="slabel">損益分岐売上高</div>
+    <div class="cfg-panel">
+      <div class="cfg-row">
+        <div class="cfg-label">目標 BEP 売上高<small>固定費 ÷ (1 − 変動費率)</small></div>
+        <input class="cfg-input" id="cfg-bep" type="number" min="0" step="100" value="30000" inputmode="numeric" onchange="handleBepChange()">
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="slabel">単価設定</div>
+    <div class="price-edit-rows" id="price-edit-rows"></div>
+    <p style="font-size:11px;color:var(--text-dim);line-height:1.6">単価を変更すると以降の販売記録に反映されます。変更後はスプレッドシートに自動保存されます。</p>
+  </section>
+
+  <section>
+    <div class="slabel">Google スプレッドシート連携</div>
+    <div class="cfg-panel">
+      <div class="cfg-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <div class="cfg-label">Apps Script デプロイ URL<small>設定方法は下の手順を参照</small></div>
+        <input class="cfg-url" id="cfg-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" value="">
+      </div>
+      <button class="btn-primary" onclick="testConnection()">接続テスト &amp; 保存</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="slabel">セットアップ手順</div>
+    <div class="setup-steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body"><b>Google スプレッドシート</b>を新規作成します。</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body">メニューの <b>「拡張機能」→「Apps Script」</b> を開き、ダウンロードした <code>apps-script.gs</code> の内容を貼り付けて保存します。</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><b>「デプロイ」→「新しいデプロイ」</b> を選択。種類を <b>「ウェブアプリ」</b> にし、アクセスを <b>「全員」</b> に設定してデプロイします。</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body">発行された <b>ウェブアプリ URL</b>（<code>https://script.google.com/macros/s/…/exec</code>）を上の欄に貼り付けて「接続テスト」を押します。</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-body">緑の <b>「接続済み」</b> 表示になれば完了。以降の販売記録はリアルタイムでスプレッドシートに書き込まれ、別端末からスプレッドシートを確認できます。</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="slabel">データリセット</div>
+    <div class="cfg-panel">
+      <button class="btn-primary" style="background:transparent;border-color:var(--red);color:var(--red)" onclick="resetAll()">売上データをリセット</button>
+    </div>
+  </section>
+</div>
+
+</main>
+
+<!-- NOTE MODAL -->
+<div class="modal-overlay" id="note-modal">
+  <div class="modal">
+    <div class="modal-title">メモを追加</div>
+    <input class="modal-input" id="note-input" type="text" placeholder="例: 値下げ ¥500→¥400 / Heineken 補充" maxlength="80">
+    <div class="modal-btns">
+      <button class="mbn cancel" onclick="closeNote()">キャンセル</button>
+      <button class="mbn confirm" onclick="confirmNote()">記録する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// ITEMS — Fish & Chips / Beer / 両方セット
+// ═══════════════════════════════════════════════════════════
+const ITEMS = [
+  { id: 'fish',  name: 'Fish & Chips', price: 500, color: 'var(--fish)',  emoji: '🐟' },
+  { id: 'beer',  name: 'Beer',          price: 400, color: 'var(--beer)',  emoji: '🍺' },
+  { id: 'set',   name: 'F&C + Beer セット', price: 800, color: 'var(--set)', emoji: '🎉' },
+];
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let state = {
+  bep: 30000,
+  revenue: 0,
+  counts: { fish: 0, beer: 0, set: 0 },
+  log: [],
+  prices: { fish: 500, beer: 400, set: 800 },
+};
+let GAS_URL = localStorage.getItem('fc_gas_url') || '';
+
+// ═══════════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════════
+function tick() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(tick,1000); tick();
+
+// ═══════════════════════════════════════════════════════════
+// SYNC STATUS
+// ═══════════════════════════════════════════════════════════
+function setSyncStatus(status, msg) {
+  const pill = document.getElementById('sync-pill');
+  const lbl  = document.getElementById('sync-label');
+  pill.className = 'sync-pill' + (status === 'ok' ? ' ok' : status === 'err' ? ' err' : '');
+  lbl.textContent = msg || (status === 'ok' ? '同期済み' : status === 'err' ? 'エラー' : '未接続');
+}
+
+// ═══════════════════════════════════════════════════════════
+// GAS API
+// ═══════════════════════════════════════════════════════════
+async function gasGet(params = {}) {
+  if (!GAS_URL) return null;
+  const url = new URL(GAS_URL);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
+  const res = await fetch(url.toString(), { mode: 'cors' });
+  return res.json();
+}
+
+async function gasPost(body) {
+  if (!GAS_URL) return null;
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+async function syncStateToSheet() {
+  if (!GAS_URL) return;
+  try {
+    await gasPost({ action: 'save_state', state: {
+      revenue: state.revenue,
+      counts: state.counts,
+      items: ITEMS.map(i => ({ ...i, price: state.prices[i.id] })),
+      bep: state.bep,
+    }});
+    setSyncStatus('ok');
+  } catch(e) {
+    setSyncStatus('err', 'シート保存失敗');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  const idx = ['sell','dash','log','cfg'].indexOf(id);
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+  if (id === 'cfg') renderPriceEditor();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITEM CARDS
+// ═══════════════════════════════════════════════════════════
+function renderItemCards() {
+  const wrap = document.getElementById('item-cards');
+  wrap.innerHTML = '';
+  ITEMS.forEach(item => {
+    const price = state.prices[item.id];
+    const count = state.counts[item.id] || 0;
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `
+      <div class="item-card-inner">
+        <div class="item-card-accent" style="background:${item.color}"></div>
+        <div class="item-card-body">
+          <div class="item-card-name">${item.emoji} ${item.name}</div>
+          <div class="item-card-price">¥${price.toLocaleString()}</div>
+        </div>
+        <div class="item-card-count">${count}</div>
+        <div class="item-card-plus">＋</div>
+      </div>
+    `;
+    card.addEventListener('click', e => sellItem(item.id, e, card));
+    wrap.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// SELL
+// ═══════════════════════════════════════════════════════════
+function sellItem(itemId, e, cardEl) {
+  const item  = ITEMS.find(i => i.id === itemId);
+  const price = state.prices[itemId];
+
+  // Ripple
+  const r = document.createElement('span');
+  r.className = 'ripple';
+  const rect = cardEl.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height);
+  r.style.cssText = `width:${size}px;height:${size}px;left:${(e.clientX??rect.left+rect.width/2)-rect.left-size/2}px;top:${(e.clientY??rect.top+rect.height/2)-rect.top-size/2}px`;
+  cardEl.appendChild(r);
+  setTimeout(() => r.remove(), 600);
+
+  state.revenue += price;
+  state.counts[itemId] = (state.counts[itemId] || 0) + 1;
+
+  const now = new Date();
+  const entry = {
+    id: Date.now(),
+    time: now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    type: 'sale',
+    itemId, itemName: item.name, color: item.color,
+    price, qty: 1, amount: price, undone: false,
+  };
+  state.log.unshift(entry);
+  document.getElementById('undo-btn').disabled = false;
+
+  // GAS: fire & forget
+  if (GAS_URL) gasPost({ action: 'add_sale', ...entry, timestamp: entry.time })
+    .then(() => setSyncStatus('ok'))
+    .catch(() => setSyncStatus('err','シート書き込み失敗'));
+
+  saveLocal();
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+// UNDO
+// ═══════════════════════════════════════════════════════════
+function undoLast() {
+  const entry = state.log.find(l => l.type === 'sale' && !l.undone);
+  if (!entry) { showToast('取り消せる操作がありません'); return; }
+  entry.undone = true;
+  state.revenue  = Math.max(0, state.revenue - entry.amount);
+  state.counts[entry.itemId] = Math.max(0, (state.counts[entry.itemId]||0) - 1);
+
+  const now = new Date();
+  const undoEntry = {
+    id: Date.now(),
+    time: now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    type: 'undo', itemName: entry.itemName, amount: -entry.amount, undone: false,
+  };
+  state.log.unshift(undoEntry);
+
+  // GAS
+  if (GAS_URL) gasPost({ action: 'add_undo', targetId: entry.id, ...undoEntry, timestamp: undoEntry.time })
+    .then(() => setSyncStatus('ok'))
+    .catch(() => setSyncStatus('err'));
+
+  if (!state.log.find(l => l.type === 'sale' && !l.undone))
+    document.getElementById('undo-btn').disabled = true;
+
+  showToast('取り消しました（' + entry.itemName + ' ¥' + entry.amount.toLocaleString() + '）');
+  saveLocal();
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+// NOTE
+// ═══════════════════════════════════════════════════════════
+function openNote() {
+  document.getElementById('note-modal').classList.add('open');
+  setTimeout(() => document.getElementById('note-input').focus(), 280);
+}
+function closeNote() {
+  document.getElementById('note-modal').classList.remove('open');
+  document.getElementById('note-input').value = '';
+}
+function confirmNote() {
+  const text = document.getElementById('note-input').value.trim();
+  if (!text) { showToast('内容を入力してください'); return; }
+  const now = new Date();
+  const entry = {
+    id: Date.now(),
+    time: now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    type: 'note', itemName: text, amount: null, undone: false,
+  };
+  state.log.unshift(entry);
+  if (GAS_URL) gasPost({ action: 'add_note', ...entry, timestamp: entry.time, note: text })
+    .then(() => setSyncStatus('ok'))
+    .catch(() => setSyncStatus('err'));
+  closeNote();
+  showToast('メモを記録しました');
+  saveLocal();
+  renderLog();
+}
+
+// ═══════════════════════════════════════════════════════════
+// METRICS
+// ═══════════════════════════════════════════════════════════
+function renderMetrics() {
+  const bep = state.bep || 0;
+  const rev = state.revenue;
+  const pct = bep > 0 ? Math.round(rev / bep * 100) : 0;
+  const total = Object.values(state.counts).reduce((a,b)=>a+b,0);
+
+  // sell page mini
+  document.getElementById('s-revenue').textContent = '¥' + rev.toLocaleString();
+  document.getElementById('s-count').textContent = total + ' 食';
+  const sb = document.getElementById('s-bep-bar');
+  sb.style.width = Math.min(pct,100) + '%';
+  sb.className = 'bep-fill' + (pct>=100?' over':'');
+  const sp = document.getElementById('s-bep-pct');
+  sp.textContent = pct + '%'; sp.className = 'bep-pct' + (pct>=100?' over':'');
+
+  // dash page
+  document.getElementById('d-revenue').textContent = '¥' + rev.toLocaleString();
+  document.getElementById('d-count').textContent = '合計 ' + total + ' 食';
+  const db = document.getElementById('d-bep-bar');
+  db.style.width = Math.min(pct,100) + '%';
+  db.className = 'bep-fill' + (pct>=100?' over':'');
+  const dp = document.getElementById('d-bep-pct');
+  dp.textContent = pct + '%'; dp.className = 'bep-pct' + (pct>=100?' over':'');
+  document.getElementById('d-bep-mid').textContent = bep>0 ? '¥'+Math.round(bep/2).toLocaleString() : '';
+  document.getElementById('d-bep-end').textContent = bep>0 ? '¥'+bep.toLocaleString() : '';
+
+  const rem = Math.max(bep - rev, 0);
+  const remEl = document.getElementById('d-remaining');
+  if (rem===0 && rev>0) { remEl.textContent='達成！'; remEl.className='mv green'; }
+  else { remEl.textContent='¥'+rem.toLocaleString(); remEl.className='mv'; }
+
+  // breakdown
+  const bkWrap = document.getElementById('bk-rows');
+  bkWrap.innerHTML = '';
+  ITEMS.forEach(item => {
+    const cnt = state.counts[item.id]||0;
+    const amt = cnt * state.prices[item.id];
+    const row = document.createElement('div');
+    row.className = 'bk-row';
+    row.innerHTML = `<div class="bk-dot" style="background:${item.color}"></div><div class="bk-name">${item.emoji} ${item.name}</div><div class="bk-cnt">${cnt}食</div><div class="bk-amt">¥${amt.toLocaleString()}</div>`;
+    bkWrap.appendChild(row);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════════════════════
+function renderLog() {
+  const list = document.getElementById('log-list');
+  if (state.log.length === 0) { list.innerHTML = '<div class="log-empty">まだ記録がありません</div>'; return; }
+  list.innerHTML = '';
+  state.log.slice(0,200).forEach(e => {
+    const el = document.createElement('div');
+    let cls = 'log-item';
+    if (e.type==='note') cls+=' note-r';
+    if (e.undone) cls+=' undone';
+    el.className = cls;
+    const amtStr = e.amount!=null ? (e.amount>=0?'+¥':'−¥')+Math.abs(e.amount).toLocaleString() : '';
+    const amtColor = e.type==='undo' ? 'var(--red)' : e.amount>0 ? 'var(--gold-light)' : 'inherit';
+    const dot = e.color ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${e.color};margin-right:5px;vertical-align:middle"></span>` : '';
+    el.innerHTML = `<span class="lt">${e.time}</span><span class="ld">${dot}${e.itemName||''}</span><span class="lq">${e.qty?e.qty+'食':''}</span><span class="la" style="color:${amtColor}">${amtStr}</span>`;
+    list.appendChild(el);
+  });
+}
+
+function clearLog() {
+  if (!confirm('ローカルのログを消去しますか？スプレッドシートは変更されません。')) return;
+  state.log = [];
+  renderLog();
+  saveLocal();
+  showToast('ログを消去しました');
+}
+
+// ═══════════════════════════════════════════════════════════
+// PRICE EDITOR
+// ═══════════════════════════════════════════════════════════
+function renderPriceEditor() {
+  document.getElementById('cfg-bep').value = state.bep;
+  const wrap = document.getElementById('price-edit-rows');
+  wrap.innerHTML = '';
+  ITEMS.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'pe-row';
+    row.innerHTML = `
+      <div class="pe-dot" style="background:${item.color}"></div>
+      <div class="pe-name">${item.emoji} ${item.name}</div>
+      <input class="pe-price-input" type="number" min="1" inputmode="numeric" value="${state.prices[item.id]}" data-id="${item.id}">
+    `;
+    row.querySelector('input').addEventListener('change', e => {
+      const v = parseInt(e.target.value);
+      if (v > 0) {
+        state.prices[item.id] = v;
+        saveLocal();
+        syncStateToSheet();
+        renderItemCards();
+        showToast(item.name + ' の単価を ¥' + v.toLocaleString() + ' に変更しました');
+      }
+    });
+    wrap.appendChild(row);
+  });
+}
+
+function handleBepChange() {
+  state.bep = parseInt(document.getElementById('cfg-bep').value) || 0;
+  saveLocal();
+  syncStateToSheet();
+  renderMetrics();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONNECTION TEST
+// ═══════════════════════════════════════════════════════════
+async function testConnection() {
+  const url = document.getElementById('cfg-url').value.trim();
+  if (!url) { showToast('URLを入力してください'); return; }
+  setSyncStatus('', '接続確認中…');
+  showToast('接続を確認しています…');
+  try {
+    GAS_URL = url;
+    const res = await gasGet({ action: 'get_state' });
+    if (res && !res.error) {
+      localStorage.setItem('fc_gas_url', url);
+      setSyncStatus('ok', '接続済み');
+      showToast('✅ 接続成功！スプレッドシートに記録されます');
+      // Load remote state if available
+      if (res.revenue) state.revenue = Number(res.revenue) || 0;
+      if (res.counts)  state.counts  = res.counts;
+      if (res.bep)     state.bep     = Number(res.bep)     || state.bep;
+      if (res.items) {
+        res.items.forEach(ri => { if (state.prices[ri.id]) state.prices[ri.id] = ri.price; });
+      }
+      saveLocal();
+      renderAll();
+    } else {
+      throw new Error('unexpected response');
+    }
+  } catch(e) {
+    GAS_URL = '';
+    setSyncStatus('err', 'エラー');
+    showToast('❌ 接続失敗。URLとデプロイ設定を確認してください');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// RESET
+// ═══════════════════════════════════════════════════════════
+function resetAll() {
+  if (!confirm('売上データをすべてリセットしますか？この操作は元に戻せません。')) return;
+  state.revenue = 0;
+  state.counts  = { fish: 0, beer: 0, set: 0 };
+  state.log     = [];
+  document.getElementById('undo-btn').disabled = true;
+  saveLocal();
+  syncStateToSheet();
+  renderAll();
+  showToast('データをリセットしました');
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOCAL STORAGE (オフラインフォールバック)
+// ═══════════════════════════════════════════════════════════
+const LS_KEY = 'fc_state_v3';
+
+function saveLocal() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.bep)     state.bep     = s.bep;
+    if (s.revenue) state.revenue = s.revenue;
+    if (s.counts)  state.counts  = s.counts;
+    if (s.log)     state.log     = s.log;
+    if (s.prices)  state.prices  = s.prices;
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════════════════════
+function renderAll() {
+  renderItemCards();
+  renderMetrics();
+  renderLog();
+}
+
+// ═══════════════════════════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('note-modal').addEventListener('click', e => { if (e.target.id === 'note-modal') closeNote(); });
+document.getElementById('note-input').addEventListener('keydown', e => { if (e.key === 'Enter') confirmNote(); });
+document.getElementById('cfg-url').addEventListener('blur', () => {
+  const url = document.getElementById('cfg-url').value.trim();
+  if (url) localStorage.setItem('fc_gas_url', url);
+});
+
+// ═══════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════
+let toastT;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+loadLocal();
+if (GAS_URL) {
+  document.getElementById('cfg-url').value = GAS_URL;
+  setSyncStatus('', '確認中…');
+  gasGet({ action: 'get_state' })
+    .then(res => {
+      if (res && !res.error) {
+        if (res.revenue) state.revenue = Number(res.revenue)||0;
+        if (res.counts)  state.counts  = res.counts;
+        if (res.bep)     state.bep     = Number(res.bep)||state.bep;
+        if (res.items) res.items.forEach(ri => { if (state.prices[ri.id]) state.prices[ri.id]=ri.price; });
+        saveLocal(); renderAll();
+        setSyncStatus('ok');
+      }
+    })
+    .catch(() => setSyncStatus('err','シート読み込み失敗'));
+}
+renderAll();
+</script>
+</body>
+</html>
