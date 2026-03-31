@@ -217,7 +217,10 @@
     </div>
   </div>
   <section>
-    <div class="slabel">品目別内訳</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div class="slabel" style="margin-bottom:0">品目別内訳</div>
+    <button onclick="loadFromSheet()" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--gold-light);font-size:12px;padding:6px 14px;cursor:pointer;font-family:'DM Mono',monospace;">↻ 更新</button>
+  </div>
     <div class="bk-rows" id="bk-rows"></div>
   </section>
 </div>
@@ -307,19 +310,19 @@
 // ═══════════════════════════════════════════════════════════
 const ITEMS = [
   { id: 'fish',  name: 'Fish & Chips', price: 500, color: 'var(--fish)',  emoji: '🐟' },
-  { id: 'beer',  name: 'Beer',          price: 500, color: 'var(--beer)',  emoji: '🍺' },
-  { id: 'set',   name: 'F&C + Beer セット', price: 900, color: 'var(--set)', emoji: '🎉' },
+  { id: 'beer',  name: 'Beer',          price: 400, color: 'var(--beer)',  emoji: '🍺' },
+  { id: 'set',   name: 'F&C + Beer セット', price: 800, color: 'var(--set)', emoji: '🎉' },
 ];
 
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
 let state = {
-  bep: 150000,
+  bep: 30000,
   revenue: 0,
   counts: { fish: 0, beer: 0, set: 0 },
   log: [],
-  prices: { fish: 500, beer: 500, set: 900 },
+  prices: { fish: 500, beer: 400, set: 800 },
 };
 let GAS_URL = 'https://script.google.com/macros/s/AKfycbyh37xpDYofntMZX9I6bd_8vCarfnlD_twmN2RAHaML8ZSge_kCz-jQK175rzjcQsrE/exec';
 
@@ -345,32 +348,31 @@ function setSyncStatus(status, msg) {
 // ═══════════════════════════════════════════════════════════
 // GAS API
 // ═══════════════════════════════════════════════════════════
-// CORS完全回避: imgタグのsrc属性でGETリクエストを送信
+// 書き込み: imgタグでCORSを完全回避
 function gasSend(params) {
   if (!GAS_URL) return;
   const url = new URL(GAS_URL);
   Object.entries(params).forEach(([k,v]) => {
     url.searchParams.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
   });
-  // imgタグはCORSの制約を受けない
   const img = new Image();
   img.src = url.toString();
 }
 
-// レスポンスが必要なGET（JSONP）
-async function gasGetWithResponse(params = {}) {
-  if (!GAS_URL) return null;
-  const url = new URL(GAS_URL);
-  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, typeof v === 'object' ? JSON.stringify(v) : v));
+// 読み込み: JSONPでスプシからデータ取得
+function gasGetWithResponse(params = {}) {
   return new Promise((resolve, reject) => {
+    if (!GAS_URL) { reject(new Error('no url')); return; }
     const cbName = '_cb_' + Date.now();
     const script = document.createElement('script');
+    const url = new URL(GAS_URL);
+    Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, String(v)));
+    url.searchParams.set('callback', cbName);
     window[cbName] = (data) => {
       delete window[cbName];
       try { document.head.removeChild(script); } catch(e) {}
       resolve(data);
     };
-    url.searchParams.set('callback', cbName);
     script.src = url.toString();
     script.onerror = () => {
       delete window[cbName];
@@ -388,24 +390,46 @@ async function gasGetWithResponse(params = {}) {
   });
 }
 
-// 書き込み系は gasSend に統一
 async function gasPost(body) {
   gasSend(body);
   return { ok: true };
 }
 
-async function syncStateToSheet() {
+function syncStateToSheet() {
   if (!GAS_URL) return;
-  try {
-    await gasPost({ action: 'save_state', state: {
+  gasSend({
+    action: 'save_state',
+    state: JSON.stringify({
       revenue: state.revenue,
       counts: state.counts,
       items: ITEMS.map(i => ({ ...i, price: state.prices[i.id] })),
       bep: state.bep,
-    }});
-    setSyncStatus('ok');
+    })
+  });
+  setSyncStatus('ok');
+}
+
+// スプシから最新状態を取得して画面に反映
+async function loadFromSheet() {
+  if (!GAS_URL) return;
+  setSyncStatus('', '読み込み中…');
+  try {
+    const res = await gasGetWithResponse({ action: 'get_state' });
+    if (res && res.ok) {
+      if (typeof res.revenue === 'number') state.revenue = res.revenue;
+      if (res.counts && Object.keys(res.counts).length > 0) state.counts = res.counts;
+      if (typeof res.bep === 'number' && res.bep > 0) state.bep = res.bep;
+      if (res.items && res.items.length > 0) {
+        res.items.forEach(ri => { if (state.prices[ri.id] !== undefined) state.prices[ri.id] = ri.price; });
+      }
+      saveLocal();
+      renderAll();
+      setSyncStatus('ok', '同期済み');
+      showToast('✅ スプシから最新データを取得しました');
+    }
   } catch(e) {
-    setSyncStatus('err', 'シート保存失敗');
+    setSyncStatus('err', '読み込み失敗');
+    showToast('⚠️ スプシへの接続に失敗しました');
   }
 }
 
@@ -419,6 +443,7 @@ function showPage(id) {
   const idx = ['sell','dash','log','cfg'].indexOf(id);
   document.querySelectorAll('.tab')[idx].classList.add('active');
   if (id === 'cfg') renderPriceEditor();
+  if (id === 'dash') loadFromSheet();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -479,9 +504,7 @@ function sellItem(itemId, e, cardEl) {
   document.getElementById('undo-btn').disabled = false;
 
   // GAS: fire & forget
-  if (GAS_URL) gasPost({ action: 'add_sale', ...entry, timestamp: entry.time })
-    .then(() => setSyncStatus('ok'))
-    .catch(() => setSyncStatus('ok'));
+  if (GAS_URL) { gasSend({ action: 'add_sale', ...entry, timestamp: entry.time }); setSyncStatus('ok'); syncStateToSheet(); }
 
   saveLocal();
   renderAll();
@@ -506,9 +529,7 @@ function undoLast() {
   state.log.unshift(undoEntry);
 
   // GAS
-  if (GAS_URL) gasPost({ action: 'add_undo', targetId: entry.id, ...undoEntry, timestamp: undoEntry.time })
-    .then(() => setSyncStatus('ok'))
-    .catch(() => setSyncStatus('ok'));
+  if (GAS_URL) { gasSend({ action: 'add_undo', targetId: entry.id, ...undoEntry, timestamp: undoEntry.time }); setSyncStatus('ok'); syncStateToSheet(); }
 
   if (!state.log.find(l => l.type === 'sale' && !l.undone))
     document.getElementById('undo-btn').disabled = true;
@@ -539,9 +560,7 @@ function confirmNote() {
     type: 'note', itemName: text, amount: null, undone: false,
   };
   state.log.unshift(entry);
-  if (GAS_URL) gasPost({ action: 'add_note', ...entry, timestamp: entry.time, note: text })
-    .then(() => setSyncStatus('ok'))
-    .catch(() => setSyncStatus('ok'));
+  if (GAS_URL) { gasSend({ action: 'add_note', ...entry, timestamp: entry.time, note: text }); setSyncStatus('ok'); }
   closeNote();
   showToast('メモを記録しました');
   saveLocal();
@@ -670,7 +689,7 @@ async function testConnection() {
   showToast('接続を確認しています…');
   try {
     GAS_URL = url;
-    const res = await gasGetWithResponse({ action: 'get_state' });
+    const res = await gasGet({ action: 'get_state' });
     if (res && !res.error) {
       localStorage.setItem('fc_gas_url', url);
       setSyncStatus('ok', '接続済み');
@@ -765,23 +784,12 @@ function showToast(msg) {
 // INIT
 // ═══════════════════════════════════════════════════════════
 loadLocal();
-if (GAS_URL) {
-  document.getElementById('cfg-url').value = GAS_URL;
-  setSyncStatus('', '確認中…');
-  gasGet({ action: 'get_state' })
-    .then(res => {
-      if (res && !res.error) {
-        if (res.revenue) state.revenue = Number(res.revenue)||0;
-        if (res.counts)  state.counts  = res.counts;
-        if (res.bep)     state.bep     = Number(res.bep)||state.bep;
-        if (res.items) res.items.forEach(ri => { if (state.prices[ri.id]) state.prices[ri.id]=ri.price; });
-        saveLocal(); renderAll();
-        setSyncStatus('ok');
-      }
-    })
-    .catch(() => setSyncStatus('err','シート読み込み失敗'));
-}
 renderAll();
+if (GAS_URL) {
+  const urlInput = document.getElementById('cfg-url');
+  if (urlInput) urlInput.value = GAS_URL;
+  loadFromSheet();
+}
 </script>
 </body>
 </html>
