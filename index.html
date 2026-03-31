@@ -152,7 +152,7 @@
 <body>
 
 <header>
-  <div class="logo">Fish &amp; Cheers <span>五月祭 2025 — 販売記録</span></div>
+  <div class="logo">Fish &amp; Cheers <span>五月祭 2026 — 販売記録</span></div>
   <div class="header-right">
     <span id="clock">--:--</span>
     <div class="sync-pill" id="sync-pill"><div class="sync-dot"></div><span id="sync-label">未接続</span></div>
@@ -307,19 +307,19 @@
 // ═══════════════════════════════════════════════════════════
 const ITEMS = [
   { id: 'fish',  name: 'Fish & Chips', price: 500, color: 'var(--fish)',  emoji: '🐟' },
-  { id: 'beer',  name: 'Beer',          price: 400, color: 'var(--beer)',  emoji: '🍺' },
-  { id: 'set',   name: 'F&C + Beer セット', price: 800, color: 'var(--set)', emoji: '🎉' },
+  { id: 'beer',  name: 'Beer',          price: 500, color: 'var(--beer)',  emoji: '🍺' },
+  { id: 'set',   name: 'F&C + Beer セット', price: 900, color: 'var(--set)', emoji: '🎉' },
 ];
 
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
 let state = {
-  bep: 30000,
+  bep: 150000,
   revenue: 0,
   counts: { fish: 0, beer: 0, set: 0 },
   log: [],
-  prices: { fish: 500, beer: 400, set: 800 },
+  prices: { fish: 500, beer: 500, set: 900 },
 };
 let GAS_URL = 'https://script.google.com/macros/s/AKfycbyh37xpDYofntMZX9I6bd_8vCarfnlD_twmN2RAHaML8ZSge_kCz-jQK175rzjcQsrE/exec';
 
