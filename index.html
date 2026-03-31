@@ -152,7 +152,7 @@
 <body>
 
 <header>
-  <div class="logo">Fish &amp; Cheers <span>五月祭 2026 — 販売記録</span></div>
+  <div class="logo">Fish &amp; Cheers <span>五月祭 2025 — 販売記録</span></div>
   <div class="header-right">
     <span id="clock">--:--</span>
     <div class="sync-pill" id="sync-pill"><div class="sync-dot"></div><span id="sync-label">未接続</span></div>
@@ -687,19 +687,18 @@ async function testConnection() {
   if (!url) { showToast('URLを入力してください'); return; }
   setSyncStatus('', '接続確認中…');
   showToast('接続を確認しています…');
+  const prevURL = GAS_URL;
+  GAS_URL = url;
   try {
-    GAS_URL = url;
-    const res = await gasGet({ action: 'get_state' });
-    if (res && !res.error) {
-      localStorage.setItem('fc_gas_url', url);
+    const res = await gasGetWithResponse({ action: 'get_state' });
+    if (res && res.ok) {
       setSyncStatus('ok', '接続済み');
-      showToast('✅ 接続成功！スプレッドシートに記録されます');
-      // Load remote state if available
-      if (res.revenue) state.revenue = Number(res.revenue) || 0;
-      if (res.counts)  state.counts  = res.counts;
-      if (res.bep)     state.bep     = Number(res.bep)     || state.bep;
-      if (res.items) {
-        res.items.forEach(ri => { if (state.prices[ri.id]) state.prices[ri.id] = ri.price; });
+      showToast('✅ 接続成功！');
+      if (typeof res.revenue === 'number') state.revenue = res.revenue;
+      if (res.counts && Object.keys(res.counts).length > 0) state.counts = res.counts;
+      if (typeof res.bep === 'number' && res.bep > 0) state.bep = res.bep;
+      if (res.items && res.items.length > 0) {
+        res.items.forEach(ri => { if (state.prices[ri.id] !== undefined) state.prices[ri.id] = ri.price; });
       }
       saveLocal();
       renderAll();
@@ -707,7 +706,7 @@ async function testConnection() {
       throw new Error('unexpected response');
     }
   } catch(e) {
-    GAS_URL = '';
+    GAS_URL = prevURL;
     setSyncStatus('err', 'エラー');
     showToast('❌ 接続失敗。URLとデプロイ設定を確認してください');
   }
